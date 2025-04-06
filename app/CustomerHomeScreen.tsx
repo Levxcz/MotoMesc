@@ -1,112 +1,137 @@
-import { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, FlatList, StyleSheet } from "react-native";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  Alert,
+  Image,
+} from "react-native";
+import { auth, db } from "../firebaseConfig";
+import { signOut } from "firebase/auth";
+import { collection, getDocs, query } from "firebase/firestore";
 
-interface Store {
+type Shop = {
   id: string;
   name: string;
+  description: string;
   location: string;
-  rating: number;
-  tag: "All" | "Both" | "Items" | "Service";
-  image: string;
-}
+  image?: string;
+};
 
 export default function CustomerHomeScreen() {
-  const [stores, setStores] = useState<Store[]>([]);
-  const [filteredStores, setFilteredStores] = useState<Store[]>([]);
-  const [activeFilter, setActiveFilter] = useState<string>("All");
+  const router = useRouter();
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStores = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "stores"));
-        const storeData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Store[];
-        setStores(storeData);
-        setFilteredStores(storeData);
-      } catch (error) {
-        console.error("Error fetching stores:", error);
-      }
-    };
-
-    fetchStores();
-  }, []);
-
-  const filterStores = (category: string) => {
-    setActiveFilter(category);
-    if (category === "All") {
-      setFilteredStores(stores);
-    } else {
-      setFilteredStores(stores.filter((store) => store.tag === category));
+  const fetchApprovedShops = async () => {
+    try {
+      const q = query(collection(db, "shops"));
+      const snapshot = await getDocs(q);
+      const shopList: Shop[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Shop[];
+      setShops(shopList);
+    } catch (error) {
+      console.error("Error fetching shops:", error);
+      Alert.alert("Failed to load shops.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/"); // Change if your login route is different
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedShops();
+  }, []);
+
   return (
     <View style={styles.container}>
-      {/* Top Navigation */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>MOTOMESC</Text>
-      </View>
+      <Text style={styles.title}>Welcome, Customer!</Text>
 
-      {/* Search Bar */}
-      <TextInput style={styles.searchBar} placeholder="Search" />
+      {loading ? (
+        <Text style={{ textAlign: "center", marginTop: 20 }}>Loading shops...</Text>
+      ) : shops.length === 0 ? (
+        <Text style={{ textAlign: "center", marginTop: 20 }}>No shops available.</Text>
+      ) : (
+        <FlatList
+          data={shops}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.shopCard}>
+              {item.image && (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${item.image}` }}
+                  style={styles.image}
+                  resizeMode="cover"
+                />
+              )}
+              <Text style={styles.shopName}>{item.name}</Text>
+              <Text>{item.description}</Text>
+              <Text>{item.location}</Text>
 
-      {/* Filter Buttons */}
-      <View style={styles.filterContainer}>
-        {["All", "Both", "Items", "Service"].map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[styles.filterButton, activeFilter === category && styles.activeFilter]}
-            onPress={() => filterStores(category)}
-          >
-            <Text style={[styles.filterText, activeFilter === category && styles.activeFilterText]}>
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Store List */}
-      <FlatList
-        data={filteredStores}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        renderItem={({ item }) => (
-          <View style={styles.storeCard}>
-            <Image source={{ uri: item.image }} style={styles.storeImage} />
-            <Text style={styles.storeName}>{item.name}</Text>
-            <Text style={styles.storeLocation}>{item.location}</Text>
-            <Text style={styles.storeRating}>⭐ {item.rating}</Text>
-            <View style={[styles.tag, item.tag === "Service" ? styles.serviceTag : styles.itemTag]}>
-              <Text style={styles.tagText}>{item.tag}</Text>
+              <TouchableOpacity
+  style={[styles.button, { backgroundColor: "blue" }]}
+  onPress={() => router.push(`/ViewShop?shopId=${item.id}`)} // Use `item.id` instead of `shop.id`
+>
+  <Text style={styles.buttonText}>View Shop</Text>
+</TouchableOpacity>
             </View>
-          </View>
-        )}
-      />
+          )}
+        />
+      )}
+
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: "gray", marginTop: 10 }]}
+        onPress={handleLogout}
+      >
+        <Text style={styles.buttonText}>Logout</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 10 },
-  topBar: { backgroundColor: "#007AFF", padding: 15, alignItems: "center" },
-  title: { color: "#fff", fontSize: 20, fontWeight: "bold" },
-  searchBar: { backgroundColor: "#F1F1F1", padding: 10, marginVertical: 10, borderRadius: 8 },
-  filterContainer: { flexDirection: "row", justifyContent: "space-around", marginVertical: 10 },
-  filterButton: { padding: 10, borderRadius: 5, backgroundColor: "#E5E5E5" },
-  activeFilter: { backgroundColor: "#007AFF" },
-  filterText: { fontSize: 14, color: "#333" },
-  activeFilterText: { color: "#fff", fontWeight: "bold" },
-  storeCard: { flex: 1, margin: 5, padding: 10, backgroundColor: "#FFF", borderRadius: 10, alignItems: "center" },
-  storeImage: { width: 100, height: 100, borderRadius: 10 },
-  storeName: { fontSize: 16, fontWeight: "bold", marginTop: 5 },
-  storeLocation: { fontSize: 12, color: "gray" },
-  storeRating: { fontSize: 14, marginTop: 5 },
-  tag: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 15, marginTop: 5 },
-  serviceTag: { backgroundColor: "green" },
-  itemTag: { backgroundColor: "blue" },
-  tagText: { color: "white", fontSize: 12 },
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
+  shopCard: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    backgroundColor: "#f5f5f5",
+  },
+  shopName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  image: {
+    width: "100%",
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  button: {
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
 });

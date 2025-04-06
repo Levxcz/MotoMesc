@@ -2,20 +2,21 @@ import React, { useState } from "react";
 import { View, Text, TextInput, Button, Alert } from "react-native";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
-import { app } from "../firebaseConfig"; // Import your Firebase config
+import { app } from "../firebaseConfig";
 
 const Register = () => {
-  const [role, setRole] = useState("customer"); // Default role
+  const [role, setRole] = useState("customer");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   const auth = getAuth(app);
   const db = getFirestore(app);
 
   const handleRegister = async () => {
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !email || !password || !phoneNumber) {
       Alert.alert("Error", "Please fill all fields.");
       return;
     }
@@ -31,12 +32,14 @@ const Register = () => {
         firstName,
         lastName,
         email,
+        phoneNumber,
         createdAt: new Date(),
       });
 
       Alert.alert("Success", "Account created successfully!");
     } catch (error) {
-      Alert.alert("Errorsds");
+      console.log("Registration Error:");
+      Alert.alert("Error");
     }
   };
 
@@ -48,6 +51,7 @@ const Register = () => {
 
       <TextInput placeholder="First Name" value={firstName} onChangeText={setFirstName} />
       <TextInput placeholder="Last Name" value={lastName} onChangeText={setLastName} />
+      <TextInput placeholder="Phone Number" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" />
       <TextInput placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
       <TextInput placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
 
