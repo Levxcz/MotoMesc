@@ -5,16 +5,33 @@ import { auth, db } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
 import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
 
+// Define the Shop type
+type Shop = {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  owner: string;
+};
+
 export default function SellerHomeScreen() {
   const router = useRouter();
-  const [shops, setShops] = useState([]);
+  const [shops, setShops] = useState<Shop[]>([]);
 
   const fetchShops = async () => {
     try {
       const user = auth.currentUser;
+      if (!user) {
+        console.error("No user is logged in");
+        return;
+      }
+
       const q = query(collection(db, "shops"), where("owner", "==", user.uid));
       const querySnapshot = await getDocs(q);
-      const shopsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const shopsList: Shop[] = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as Omit<Shop, "id">),
+      }));
       setShops(shopsList);
     } catch (error) {
       console.error("Failed to fetch shops:", error);

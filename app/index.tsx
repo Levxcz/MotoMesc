@@ -5,6 +5,7 @@ import { loginUser } from "../authService";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
