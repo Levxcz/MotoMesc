@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  Button,
+} from "react-native";
+import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { useRoute } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
 
 interface Shop {
   name: string;
@@ -13,98 +25,246 @@ interface Shop {
   offersService: boolean;
   createdAt: any;
   owner: string;
+  services?: string[];
 }
 
-export default function ViewShop() {
-  const { shopId } = useLocalSearchParams(); // Use `shopId` to match the query parameter name
+const ViewShop: React.FC = () => {
   const [shop, setShop] = useState<Shop | null>(null);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [plateNumber, setPlateNumber] = useState("");
+  const [description, setDescription] = useState("");
+  const [motoImage, setMotoImage] = useState<string | null>(null);
+  const route = useRoute();
+  const { shopId } = route.params as { shopId: string };
 
   useEffect(() => {
-    const fetchShop = async () => {
+    const fetchShopDetails = async () => {
       try {
-        console.log(`Fetching shop with ID: ${shopId}`); // Add logging to verify shopId
-        if (!shopId) {
-          console.log("No shopId provided");
-          setShop(null);
-          setLoading(false);
-          return;
-        }
-
-        const docRef = doc(db, "shops", shopId as string);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          console.log("Shop data:", docSnap.data()); // Log the shop data for debugging
-          setShop(docSnap.data() as Shop);
+        const shopRef = doc(db, "shops", shopId);
+        const shopSnap = await getDoc(shopRef);
+        if (shopSnap.exists()) {
+          const shopData = shopSnap.data() as Shop;
+          setShop(shopData);
         } else {
-          console.log("Shop not found with that ID.");
-          setShop(null); // Trigger the "Shop not found" message
+          console.log("No such shop!");
         }
       } catch (error) {
-        console.error("Failed to fetch shop:", error);
-        setShop(null); // Ensure it's set to null on error
+        console.error("Error fetching shop details:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchShop();
+    fetchShopDetails();
   }, [shopId]);
 
-  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color="#0000ff" />;
-  if (!shop) return <Text style={{ padding: 20 }}>Shop not found.</Text>;
+  const formatServiceName = (key: string) => {
+    return key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase());
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setMotoImage(result.assets[0].uri);
+    }
+  };
+
+  const handleAppointmentSubmit = async () => {
+    if (!plateNumber || !description || !motoImage) {
+      alert("Please complete all fields.");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "appointments"), {
+        shopId,
+        plateNumber,
+        description,
+        image: motoImage,
+        createdAt: serverTimestamp(),
+      });
+
+      alert("Appointment submitted!");
+      setModalVisible(false);
+      setPlateNumber("");
+      setDescription("");
+      setMotoImage(null);
+    } catch (error) {
+      console.error("Error making appointment:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  if (!shop) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Shop not found.</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {shop.image && (
-        <Image
-          source={{ uri: `data:image/jpeg;base64,${shop.image}` }}
-          style={styles.image}
-        />
-      )}
-      <Text style={styles.name}>{shop.name}</Text>
+    <ScrollView style={styles.container}>
+      {shop.image && <Image source={{ uri: shop.image }} style={styles.shopImage} />}
+      <Text style={styles.shopName}>{shop.name}</Text>
       <Text style={styles.label}>Description:</Text>
       <Text style={styles.text}>{shop.description}</Text>
-
       <Text style={styles.label}>Location:</Text>
       <Text style={styles.text}>{shop.location}</Text>
-
       <Text style={styles.label}>Availability:</Text>
-      <Text style={styles.text}>
-        {shop.offersParts ? "✓ Motorcycle Parts" : "✗ Motorcycle Parts"}
-      </Text>
       <Text style={styles.text}>
         {shop.offersService ? "✓ Motorcycle Services" : "✗ Motorcycle Services"}
       </Text>
+      <Text style={styles.text}>
+        {shop.offersParts ? "✓ Motorcycle Parts" : "✗ Motorcycle Parts"}
+      </Text>
+      <Text style={styles.label}>Services Offered:</Text>
+      {shop.services && shop.services.length > 0 ? (
+        shop.services.map((serviceKey) => (
+          <Text key={serviceKey} style={styles.text}>
+            • {formatServiceName(serviceKey)}
+          </Text>
+        ))
+      ) : (
+        <Text style={styles.text}>No services listed.</Text>
+      )}
+
+      <TouchableOpacity style={styles.appointmentBtn} onPress={() => setModalVisible(true)}>
+        <Text style={styles.btnText}>Make Appointment</Text>
+      </TouchableOpacity>
+
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Book an Appointment</Text>
+
+          <TextInput
+            placeholder="Plate Number"
+            value={plateNumber}
+            onChangeText={setPlateNumber}
+            style={styles.input}
+          />
+          <TextInput
+            placeholder="Describe the issue"
+            value={description}
+            onChangeText={setDescription}
+            style={[styles.input, { height: 100 }]}
+            multiline
+          />
+
+          <TouchableOpacity onPress={pickImage} style={styles.uploadBtn}>
+            <Text style={styles.btnText}>{motoImage ? "Change Image" : "Upload Motorcycle Photo"}</Text>
+          </TouchableOpacity>
+          {motoImage && <Image source={{ uri: motoImage }} style={styles.previewImage} />}
+
+          <Button title="Submit Appointment" onPress={handleAppointmentSubmit} />
+          <Button title="Cancel" color="red" onPress={() => setModalVisible(false)} />
+        </View>
+      </Modal>
     </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    alignItems: "center",
+    flex: 1,
+    padding: 16,
     backgroundColor: "#fff",
   },
-  image: {
-    width: 250,
-    height: 250,
-    borderRadius: 10,
-    marginBottom: 20,
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  name: {
+  shopImage: {
+    width: "100%",
+    height: 200,
+    marginBottom: 16,
+    borderRadius: 10,
+  },
+  shopName: {
     fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 15,
+    marginBottom: 12,
+    textAlign: "center",
   },
   label: {
+    fontSize: 18,
     fontWeight: "bold",
-    fontSize: 16,
-    marginTop: 10,
+    marginTop: 12,
+    marginBottom: 4,
   },
   text: {
     fontSize: 16,
-    marginBottom: 5,
+    marginBottom: 4,
+  },
+  errorText: {
+    fontSize: 18,
+    color: "red",
+    textAlign: "center",
+    marginTop: 50,
+  },
+  appointmentBtn: {
+    marginTop: 20,
+    backgroundColor: "#007AFF",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  btnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  modalView: {
+    marginTop: 100,
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  uploadBtn: {
+    backgroundColor: "#007AFF",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  previewImage: {
+    width: "100%",
+    height: 150,
+    marginBottom: 10,
+    borderRadius: 10,
   },
 });
+
+export default ViewShop;
