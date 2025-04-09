@@ -10,7 +10,6 @@ import {
   Image,
 } from "react-native";
 import { auth, db } from "../firebaseConfig";
-import { signOut } from "firebase/auth";
 import { collection, getDocs, query } from "firebase/firestore";
 
 type Shop = {
@@ -43,14 +42,7 @@ export default function CustomerHomeScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push("/"); // Change if your login route is different
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
+
 
   useEffect(() => {
     fetchApprovedShops();
@@ -82,22 +74,31 @@ export default function CustomerHomeScreen() {
               <Text>{item.location}</Text>
 
               <TouchableOpacity
-  style={[styles.button, { backgroundColor: "blue" }]}
-  onPress={() => router.push(`/ViewShop?shopId=${item.id}`)} // Use `item.id` instead of `shop.id`
->
-  <Text style={styles.buttonText}>View Shop</Text>
-</TouchableOpacity>
+                style={[styles.button, { backgroundColor: "blue" }]}
+                onPress={() => router.push(`/ViewShop?shopId=${item.id}`)}
+              >
+                <Text style={styles.buttonText}>View Shop</Text>
+              </TouchableOpacity>
             </View>
           )}
         />
       )}
 
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: "gray", marginTop: 10 }]}
-        onPress={handleLogout}
-      >
-        <Text style={styles.buttonText}>Logout</Text>
-      </TouchableOpacity>
+      {/* Bottom Navigation Bar */}
+      <View style={styles.navContainer}>
+        <TouchableOpacity onPress={() => router.push("/CustomerHomeScreen")}>
+          <Text style={styles.navText}>Home</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/Notifications")}>
+          <Text style={styles.navText}>Notification</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/Profile")}>
+          <Text style={styles.navText}>Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/Appointments")}>
+          <Text style={styles.navText}>Appointments</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -133,5 +134,22 @@ const styles = StyleSheet.create({
     color: "white",
     textAlign: "center",
     fontWeight: "bold",
+  },
+  navContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 10,
+    backgroundColor: "#eee",
+    borderTopWidth: 1,
+    borderTopColor: "#ccc",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  navText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
   },
 });
