@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Text, View, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { Text, View, Image, TouchableOpacity, StyleSheet, ScrollView, Modal, Pressable, Alert } from 'react-native';
 import { db } from '../firebaseConfig';
 import { doc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { sendNotification } from '../sendNotification'
 
 interface Appointment {
   id: string;
@@ -11,11 +12,14 @@ interface Appointment {
   plateNumber: string;
   createdAt: any; // Firestore timestamp
   status: string;
+  customerId: string; // Add customerId field to be used for notifications
   tracking: Array<{ step: string, timestamp: any }>;
 }
 
 const SellerAppointmentScreen: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -32,68 +36,104 @@ const SellerAppointmentScreen: React.FC = () => {
 
   const confirmAppointment = async (id: string) => {
     const docRef = doc(db, "appointments", id);
-    const selectedAppointment = appointments.find(appt => appt.id === id);
-    if (!selectedAppointment) return;
+    const selected = appointments.find(appt => appt.id === id);
+    if (!selected) return;
 
     await updateDoc(docRef, {
       status: "confirmed",
-      tracking: [
-        ...selectedAppointment.tracking || [],
-        { step: "Confirmed by Seller", timestamp: new Date() }
-      ]
+      tracking: [...(selected.tracking || []), { step: "Confirmed by Seller", timestamp: new Date() }]
     });
+
+    // Trigger notification to the customer
+    await sendNotification(selected.customerId, 'confirmed');
+
+    setModalVisible(false);
+    Alert.alert("Appointment Confirmed", "You have confirmed the appointment.");
   };
 
   const declineAppointment = async (id: string) => {
     const docRef = doc(db, "appointments", id);
-    const selectedAppointment = appointments.find(appt => appt.id === id);
-    if (!selectedAppointment) return;
+    const selected = appointments.find(appt => appt.id === id);
+    if (!selected) return;
 
     await updateDoc(docRef, {
       status: "declined",
-      tracking: [
-        ...selectedAppointment.tracking || [],
-        { step: "Declined by Seller", timestamp: new Date() }
-      ]
+      tracking: [...(selected.tracking || []), { step: "Declined by Seller", timestamp: new Date() }]
     });
+
+    // Trigger notification to the customer
+    await sendNotification(selected.customerId, 'declined');
+
+    setModalVisible(false);
+    Alert.alert("Appointment Declined", "You have declined the appointment.");
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Your Appointments</Text>
       {appointments.map(appt => (
-        <View key={appt.id} style={styles.appointmentCard}>
+        <TouchableOpacity 
+          key={appt.id} 
+          style={styles.appointmentCard} 
+          onPress={() => {
+            setSelectedAppointment(appt);
+            setModalVisible(true);
+          }}
+        >
           <Image 
             source={{ uri: appt.image || 'https://via.placeholder.com/64' }} 
             style={styles.image} 
           />
           <Text><Text style={styles.boldText}>Customer:</Text> {appt.customerName}</Text>
-          <Text><Text style={styles.boldText}>Service:</Text> {appt.description}</Text>
-          <Text><Text style={styles.boldText}>Plate Number:</Text> {appt.plateNumber}</Text>
-          <Text>
-            <Text style={styles.boldText}>Created At:</Text>{' '}
-            {appt.createdAt && new Date(appt.createdAt.seconds * 1000).toLocaleString()}
-          </Text>
           <Text><Text style={styles.boldText}>Status:</Text> {appt.status}</Text>
-
-          {appt.status === 'pending' && (
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                onPress={() => confirmAppointment(appt.id)} 
-                style={[styles.button, styles.confirmButton]}
-              >
-                <Text style={styles.buttonText}>Confirm</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => declineAppointment(appt.id)} 
-                style={[styles.button, styles.declineButton]}
-              >
-                <Text style={styles.buttonText}>Decline</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+        </TouchableOpacity>
       ))}
+
+      {selectedAppointment && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalView}>
+              <Text style={styles.modalTitle}>Appointment Details</Text>
+              <Image 
+                source={{ uri: selectedAppointment.image || 'https://via.placeholder.com/64' }} 
+                style={styles.image} 
+              />
+              <Text><Text style={styles.boldText}>Customer:</Text> {selectedAppointment.customerName}</Text>
+              <Text><Text style={styles.boldText}>Service:</Text> {selectedAppointment.description}</Text>
+              <Text><Text style={styles.boldText}>Plate Number:</Text> {selectedAppointment.plateNumber}</Text>
+              <Text>
+                <Text style={styles.boldText}>Created At:</Text>{' '}
+                {selectedAppointment.createdAt?.seconds ? new Date(selectedAppointment.createdAt.seconds * 1000).toLocaleString() : 'N/A'}
+              </Text>
+              <Text><Text style={styles.boldText}>Status:</Text> {selectedAppointment.status}</Text>
+
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  onPress={() => confirmAppointment(selectedAppointment.id)} 
+                  style={[styles.button, styles.confirmButton]}
+                >
+                  <Text style={styles.buttonText}>Confirm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => declineAppointment(selectedAppointment.id)} 
+                  style={[styles.button, styles.declineButton]}
+                >
+                  <Text style={styles.buttonText}>Decline</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Pressable onPress={() => setModalVisible(false)} style={styles.closeButton}>
+                <Text style={{ color: 'white', fontWeight: 'bold' }}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 };
@@ -129,16 +169,33 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: 'bold',
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalView: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: 'black',
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 20,
   },
   button: {
     flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    padding: 10,
+    marginHorizontal: 5,
     borderRadius: 5,
     alignItems: 'center',
   },
@@ -152,6 +209,13 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  closeButton: {
+    marginTop: 10,
+    backgroundColor: '#888',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  }
 });
 
 export default SellerAppointmentScreen;
