@@ -11,8 +11,15 @@ import {
   TouchableOpacity,
   Button,
 } from "react-native";
-import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
+import { getAuth } from "firebase/auth";
 import { useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 
@@ -35,6 +42,9 @@ const ViewShop: React.FC = () => {
   const [plateNumber, setPlateNumber] = useState("");
   const [description, setDescription] = useState("");
   const [motoImage, setMotoImage] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+
   const route = useRoute();
   const { shopId } = route.params as { shopId: string };
 
@@ -56,7 +66,26 @@ const ViewShop: React.FC = () => {
       }
     };
 
+    const fetchCustomerDetails = async () => {
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (user) {
+          const userRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            setFirstName(userData.firstName);
+            setLastName(userData.lastName);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching customer details:", error);
+      }
+    };
+
     fetchShopDetails();
+    fetchCustomerDetails();
   }, [shopId]);
 
   const formatServiceName = (key: string) => {
@@ -79,7 +108,7 @@ const ViewShop: React.FC = () => {
       alert("Please complete all fields.");
       return;
     }
-
+  
     try {
       await addDoc(collection(db, "appointments"), {
         shopId,
@@ -87,8 +116,10 @@ const ViewShop: React.FC = () => {
         description,
         image: motoImage,
         createdAt: serverTimestamp(),
+        customerName: `${firstName} ${lastName}`,
+        status: "Pending", // ✅ Automatically set status
       });
-
+  
       alert("Appointment submitted!");
       setModalVisible(false);
       setPlateNumber("");
@@ -98,7 +129,7 @@ const ViewShop: React.FC = () => {
       console.error("Error making appointment:", error);
     }
   };
-
+  
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
@@ -148,6 +179,9 @@ const ViewShop: React.FC = () => {
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalView}>
           <Text style={styles.modalTitle}>Book an Appointment</Text>
+          <Text style={{ textAlign: "center", marginBottom: 10 }}>
+            Customer: {firstName} {lastName}
+          </Text>
 
           <TextInput
             placeholder="Plate Number"
@@ -164,7 +198,9 @@ const ViewShop: React.FC = () => {
           />
 
           <TouchableOpacity onPress={pickImage} style={styles.uploadBtn}>
-            <Text style={styles.btnText}>{motoImage ? "Change Image" : "Upload Motorcycle Photo"}</Text>
+            <Text style={styles.btnText}>
+              {motoImage ? "Change Image" : "Upload Motorcycle Photo"}
+            </Text>
           </TouchableOpacity>
           {motoImage && <Image source={{ uri: motoImage }} style={styles.previewImage} />}
 
