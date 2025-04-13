@@ -1,101 +1,88 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity } from "react-native";
-import { auth, db } from "../firebaseConfig";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { useRouter } from "expo-router";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from "react-native";
+import { firebase } from "../authService"; // Firebase Auth
+import { fetchNotifications } from "../fetchNotifications";
+import { markAsRead } from "../markAsRead";
 
-type Notification = {
+interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  timestamp: string; // Store as string, could be a Firestore timestamp
+  timestamp: any; // Firestore Timestamp or null
   read: boolean;
-};
+}
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-
-  const fetchNotifications = async () => {
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        Alert.alert("No user logged in.");
-        return;
-      }
-
-      const notificationsRef = collection(db, "notifications");
-      const q = query(notificationsRef, orderBy("timestamp", "desc")); // Sort by most recent
-      const snapshot = await getDocs(q);
-      const notificationList: Notification[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp.toDate().toLocaleString(), // Format Firestore timestamp
-      })) as Notification[];
-
-      setNotifications(notificationList);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      Alert.alert("Failed to load notifications.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchNotifications();
+    const loadNotifications = async () => {
+      const currentUser = firebase.auth().currentUser;
+
+      if (currentUser) {
+        try {
+          const fetchedNotifications = await fetchNotifications(currentUser.uid);
+          setNotifications(fetchedNotifications as NotificationItem[]);
+        } catch (error) {
+          Alert.alert("Failed to load notifications.");
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        Alert.alert("No user is currently logged in.");
+        setLoading(false);
+      }
+    };
+
+    loadNotifications();
   }, []);
 
   const handleMarkAsRead = async (id: string) => {
-    // Here, you can update the read status of the notification in Firestore
     try {
-
-      
-      setNotifications((prevNotifications) =>
-        prevNotifications.map((notif) =>
+      await markAsRead(id);
+      setNotifications((prev) =>
+        prev.map((notif) =>
           notif.id === id ? { ...notif, read: true } : notif
         )
       );
     } catch (error) {
-      console.error("Error marking notification as read:", error);
+      Alert.alert("Failed to mark as read.");
     }
   };
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <Text>Loading notifications...</Text>
-      </View>
-    );
+    return <Text>Loading...</Text>;
   }
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Notifications</Text>
-
       {notifications.length === 0 ? (
-        <Text style={styles.noNotifications}>No notifications available.</Text>
+        <Text>No notifications available.</Text>
       ) : (
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.notificationCard}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.message}>{item.message}</Text>
-              <Text style={styles.timestamp}>{item.timestamp}</Text>
+          renderItem={({ item }) => {
+            const timestamp = item.timestamp?.toDate?.() || new Date();
+            return (
+              <View style={styles.notificationCard}>
+                <Text style={styles.title}>{item.title}</Text>
+                <Text style={styles.message}>{item.message}</Text>
+                <Text style={styles.timestamp}>{timestamp.toLocaleString()}</Text>
 
-              {!item.read && (
-                <TouchableOpacity
-                  style={styles.markAsReadBtn}
-                  onPress={() => handleMarkAsRead(item.id)}
-                >
-                  <Text style={styles.btnText}>Mark as Read</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                {!item.read && (
+                  <TouchableOpacity
+                    style={styles.markAsReadBtn}
+                    onPress={() => handleMarkAsRead(item.id)}
+                  >
+                    <Text style={styles.btnText}>Mark as Read</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          }}
         />
       )}
     </View>
@@ -104,25 +91,11 @@ export default function Notifications() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  header: { fontSize: 26, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
-  noNotifications: { textAlign: "center", fontSize: 18, color: "gray" },
-  notificationCard: {
-    backgroundColor: "#f5f5f5",
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-  },
+  header: { fontSize: 26, fontWeight: "bold", marginBottom: 20 },
+  notificationCard: { backgroundColor: "#f5f5f5", padding: 15, marginBottom: 15, borderRadius: 8 },
   title: { fontSize: 18, fontWeight: "bold" },
   message: { fontSize: 16, marginVertical: 5 },
   timestamp: { fontSize: 14, color: "gray" },
-  markAsReadBtn: {
-    marginTop: 10,
-    backgroundColor: "#4CAF50",
-    padding: 10,
-    borderRadius: 5,
-  },
+  markAsReadBtn: { backgroundColor: "#4CAF50", padding: 10, borderRadius: 5, marginTop: 10 },
   btnText: { color: "white", textAlign: "center", fontWeight: "bold" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 });
