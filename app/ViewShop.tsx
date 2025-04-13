@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { query, where, getDocs } from "firebase/firestore";
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
 import {
   doc,
   getDoc,
+  setDoc,
   addDoc,
   collection,
   serverTimestamp,
@@ -43,6 +45,7 @@ const ViewShop: React.FC = () => {
   const [description, setDescription] = useState("");
   const [motoImage, setMotoImage] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState<string>("");
   const [lastName, setLastName] = useState("");
 
   const route = useRoute();
@@ -104,31 +107,77 @@ const ViewShop: React.FC = () => {
   };
 
   const handleAppointmentSubmit = async () => {
-    if (!plateNumber || !description || !motoImage) {
+    if (!plateNumber || !description || !motoImage || !appointmentDate) {
       alert("Please complete all fields.");
       return;
     }
   
+    const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate);
+    if (!isValidDate) {
+      alert("Invalid date format. Please use YYYY-MM-DD.");
+      return;
+    }
+  
     try {
-      await addDoc(collection(db, "appointments"), {
+      const auth = getAuth();
+      const user = auth.currentUser;
+  
+      if (!user) {
+        alert("You must be logged in to make an appointment.");
+        return;
+      }
+  
+      const uid = user.uid;
+  
+      // 🔍 Check for existing pending appointment for the same shop
+      const q = query(
+        collection(db, "appointments"),
+        where("uid", "==", uid),
+        where("shopId", "==", shopId),
+        where("status", "==", "Pending")
+      );
+  
+      const querySnapshot = await getDocs(q);
+  
+      if (!querySnapshot.empty) {
+        alert("You already have a pending appointment at this shop.");
+        return;
+      }
+  
+      // 📝 Add new appointment
+      const docRef = await addDoc(collection(db, "appointments"), {
+        appointmentId: "",
         shopId,
+        uid,
         plateNumber,
         description,
         image: motoImage,
         createdAt: serverTimestamp(),
+        appointmentDate, // Save as string
         customerName: `${firstName} ${lastName}`,
-        status: "Pending", // ✅ Automatically set status
+        status: "Pending",
       });
+  
+      // 🆔 Update the document with its own ID
+      await setDoc(
+        doc(db, "appointments", docRef.id),
+        { appointmentId: docRef.id },
+        { merge: true }
+      );
   
       alert("Appointment submitted!");
       setModalVisible(false);
       setPlateNumber("");
       setDescription("");
       setMotoImage(null);
+      setAppointmentDate("");
     } catch (error) {
       console.error("Error making appointment:", error);
+      alert("Something went wrong. Please try again.");
     }
   };
+
+  
   
   if (loading) {
     return (
@@ -196,6 +245,13 @@ const ViewShop: React.FC = () => {
             style={[styles.input, { height: 100 }]}
             multiline
           />
+            <TextInput
+            placeholder="Enter appointment date (YYYY-MM-DD)"
+            value={appointmentDate}
+            onChangeText={setAppointmentDate}
+            style={styles.input}
+          />
+
 
           <TouchableOpacity onPress={pickImage} style={styles.uploadBtn}>
             <Text style={styles.btnText}>

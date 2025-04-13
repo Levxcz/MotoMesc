@@ -1,9 +1,9 @@
 import { db } from './firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-export const sendNotification = async (userId: string, message: string) => {
+export const sendNotification = async (uid: string, message: string) => {
   try {
-    if (!userId || !message) {
+    if (!uid|| !message) {
       throw new Error('User ID or message is missing');
     }
 
@@ -12,7 +12,7 @@ export const sendNotification = async (userId: string, message: string) => {
       message: message, // Make sure this is not undefined
       timestamp: new Date(),
       read: false,
-      uid: userId, // Ensure that userId is valid and not undefined
+      uid: uid, // Ensure that userId is valid and not undefined
     };
 
     console.log("Notification to be sent:", notification); // Debugging line

@@ -1,12 +1,12 @@
 import { db } from './firebaseConfig';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
-export const fetchNotifications = async (userId: string) => {
+export const fetchNotifications = async (uid: string) => {
   try {
     const notificationsRef = collection(db, 'notifications');
     const q = query(
       notificationsRef,
-      where('uid', '==', userId),     // ✅ match based on 'uid'
+      where('uid', '==', uid),     // ✅ match based on 'uid'
       orderBy('timestamp', 'desc')   // ✅ newest first
     );
 

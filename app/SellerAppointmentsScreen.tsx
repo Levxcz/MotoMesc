@@ -7,12 +7,13 @@ import { sendNotification } from '../sendNotification'
 interface Appointment {
   id: string;
   customerName: string;
+  appointmentDate: string;
   description: string;
   image: string;
   plateNumber: string;
   createdAt: any; // Firestore timestamp
   status: string;
-  customerId: string; // Add customerId field to be used for notifications
+  uid: string; // Add customerId field to be used for notifications
   tracking: Array<{ step: string, timestamp: any }>;
 }
 
@@ -45,7 +46,7 @@ const SellerAppointmentScreen: React.FC = () => {
     });
 
     // Trigger notification to the customer
-    await sendNotification(selected.customerId, 'confirmed');
+    await sendNotification(selected.uid, 'confirmed');
 
     setModalVisible(false);
     Alert.alert("Appointment Confirmed", "You have confirmed the appointment.");
@@ -62,7 +63,7 @@ const SellerAppointmentScreen: React.FC = () => {
     });
 
     // Trigger notification to the customer
-    await sendNotification(selected.customerId, 'declined');
+    await sendNotification(selected.uid, 'declined');
 
     setModalVisible(false);
     Alert.alert("Appointment Declined", "You have declined the appointment.");
@@ -106,6 +107,7 @@ const SellerAppointmentScreen: React.FC = () => {
               <Text><Text style={styles.boldText}>Customer:</Text> {selectedAppointment.customerName}</Text>
               <Text><Text style={styles.boldText}>Service:</Text> {selectedAppointment.description}</Text>
               <Text><Text style={styles.boldText}>Plate Number:</Text> {selectedAppointment.plateNumber}</Text>
+              <Text><Text style={styles.boldText}>Booking Date:</Text> {selectedAppointment.appointmentDate}</Text>
               <Text>
                 <Text style={styles.boldText}>Created At:</Text>{' '}
                 {selectedAppointment.createdAt?.seconds ? new Date(selectedAppointment.createdAt.seconds * 1000).toLocaleString() : 'N/A'}
