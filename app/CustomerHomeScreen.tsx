@@ -1,5 +1,4 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,7 +7,12 @@ import {
   FlatList,
   Alert,
   Image,
+  ActivityIndicator,
+  BackHandler,
 } from "react-native";
+import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "../firebaseConfig";
 import { collection, getDocs, query } from "firebase/firestore";
 
@@ -24,6 +28,7 @@ export default function CustomerHomeScreen() {
   const router = useRouter();
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const fetchApprovedShops = async () => {
     try {
@@ -42,24 +47,73 @@ export default function CustomerHomeScreen() {
     }
   };
 
-
-
+  // 🔒 Authentication guard
   useEffect(() => {
-    fetchApprovedShops();
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        router.replace("/"); // Redirect to login
+      } else {
+        fetchApprovedShops();
+      }
+      setCheckingAuth(false);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  // 🔙 Custom back handler only when this screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const backAction = () => {
+        Alert.alert(
+          "Hold on!",
+          "Do you want to logout or exit the app?",
+          [
+            {
+              text: "Logout",
+              onPress: async () => {
+                await AsyncStorage.removeItem("role");
+                router.replace("/");
+              },
+            },
+            {
+              text: "Exit App",
+              onPress: () => BackHandler.exitApp(),
+            },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+
+      return () => backHandler.remove();
+    }, [])
+  );
+
+  if (checkingAuth) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="blue" />
+        <Text>Checking authentication...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome, Customer!</Text>
 
       {loading ? (
-        <Text style={{ textAlign: "center", marginTop: 20 }}>Loading shops...</Text>
+        <Text style={styles.loadingText}>Loading shops...</Text>
       ) : shops.length === 0 ? (
-        <Text style={{ textAlign: "center", marginTop: 20 }}>No shops available.</Text>
+        <Text style={styles.loadingText}>No shops available.</Text>
       ) : (
         <FlatList
           data={shops}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 100 }}
           renderItem={({ item }) => (
             <View style={styles.shopCard}>
               {item.image && (
@@ -74,7 +128,7 @@ export default function CustomerHomeScreen() {
               <Text>{item.location}</Text>
 
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: "blue" }]}
+                style={styles.button}
                 onPress={() => router.push(`/ViewShop?shopId=${item.id}`)}
               >
                 <Text style={styles.buttonText}>View Shop</Text>
@@ -105,7 +159,13 @@ export default function CustomerHomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
+  loadingText: { textAlign: "center", marginTop: 20, fontSize: 16 },
   shopCard: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -126,6 +186,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   button: {
+    backgroundColor: "#007bff",
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
@@ -138,7 +199,7 @@ const styles = StyleSheet.create({
   navContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
-    padding: 10,
+    paddingVertical: 12,
     backgroundColor: "#eee",
     borderTopWidth: 1,
     borderTopColor: "#ccc",
