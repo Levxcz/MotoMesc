@@ -7,8 +7,9 @@ import {
   StyleSheet,
   FlatList,
   Alert,
-  Image,
+  BackHandler,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { auth, db } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
 import {
@@ -20,7 +21,7 @@ import {
   doc,
 } from "firebase/firestore";
 
-// Define the Shop type
+// Types
 type Shop = {
   id: string;
   name: string;
@@ -29,59 +30,63 @@ type Shop = {
   owner: string;
 };
 
-// Define the Appointment type
 type Appointment = {
   id: string;
   shopId: string;
-  customerId: string;
-  description: string;
-  plateNumber: string;
-  motorImage: string;
 };
 
 export default function SellerHomeScreen() {
   const router = useRouter();
   const [shops, setShops] = useState<Shop[]>([]);
-  const [appointmentsByShop, setAppointmentsByShop] = useState<Record<string, Appointment[]>>({});
+  const [appointmentShopIds, setAppointmentShopIds] = useState<Set<string>>(new Set());
 
-  const fetchAppointments = async (shopId: string) => {
+  // 🔒 BACK BUTTON GUARD (Disable going back)
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        return true; // Prevent default back behavior
+      };
+
+      BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => BackHandler.removeEventListener("hardwareBackPress", onBackPress);
+    }, [])
+  );
+
+  const fetchAppointmentsByShop = async (shopIds: string[]) => {
     try {
-      const q = query(collection(db, "appointments"), where("shopId", "==", shopId));
-      const querySnapshot = await getDocs(q);
-      const appointments: Appointment[] = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Appointment, "id">),
-      }));
-      return appointments;
+      const q = query(collection(db, "appointments"), where("shopId", "in", shopIds));
+      const snapshot = await getDocs(q);
+
+      const shopIdSet = new Set<string>();
+      snapshot.forEach((doc) => {
+        const data = doc.data() as Appointment;
+        shopIdSet.add(data.shopId);
+      });
+
+      setAppointmentShopIds(shopIdSet);
     } catch (error) {
       console.error("Failed to fetch appointments:", error);
-      return [];
     }
   };
 
   const fetchShops = async () => {
     try {
       const user = auth.currentUser;
-      if (!user) {
-        console.error("No user is logged in");
-        return;
-      }
+      if (!user) return;
 
       const q = query(collection(db, "shops"), where("owner", "==", user.uid));
       const querySnapshot = await getDocs(q);
+
       const shopsList: Shop[] = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...(doc.data() as Omit<Shop, "id">),
       }));
+
       setShops(shopsList);
 
-      // Fetch appointments for each shop
-      const appointmentsMap: Record<string, Appointment[]> = {};
-      for (const shop of shopsList) {
-        const appointments = await fetchAppointments(shop.id);
-        appointmentsMap[shop.id] = appointments;
-      }
-      setAppointmentsByShop(appointmentsMap);
+      const shopIds = shopsList.map((shop) => shop.id);
+      if (shopIds.length > 0) await fetchAppointmentsByShop(shopIds);
     } catch (error) {
       console.error("Failed to fetch shops:", error);
     }
@@ -91,7 +96,7 @@ export default function SellerHomeScreen() {
     try {
       await deleteDoc(doc(db, "shops", shopId));
       Alert.alert("Shop deleted");
-      fetchShops(); // Refresh the list
+      fetchShops();
     } catch (error) {
       console.error("Delete failed:", error);
     }
@@ -100,7 +105,7 @@ export default function SellerHomeScreen() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.push("/"); // Navigate to login screen
+      router.push("/"); // Redirect to login or landing page
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -147,27 +152,6 @@ export default function SellerHomeScreen() {
             >
               <Text style={styles.buttonText}>Delete</Text>
             </TouchableOpacity>
-
-            <Text style={{ marginTop: 10, fontWeight: "bold" }}>Appointments:</Text>
-            {appointmentsByShop[item.id] && appointmentsByShop[item.id].length > 0 ? (
-              appointmentsByShop[item.id].map((appt) => (
-                <View key={appt.id} style={styles.appointmentCard}>
-                  <Text style={{ fontWeight: "bold" }}>Plate: {appt.plateNumber}</Text>
-                  <Text>Description: {appt.description}</Text>
-                  {appt.motorImage ? (
-                    <Image
-                      source={{ uri: appt.motorImage }}
-                      style={{ width: "100%", height: 150, marginTop: 5, borderRadius: 5 }}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Text>No image provided</Text>
-                  )}
-                </View>
-              ))
-            ) : (
-              <Text style={{ color: "gray" }}>No Appointments</Text>
-            )}
           </View>
         )}
       />
@@ -195,13 +179,5 @@ const styles = StyleSheet.create({
   shopName: {
     fontSize: 18,
     fontWeight: "bold",
-  },
-  appointmentCard: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#ccc",
   },
 });

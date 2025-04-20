@@ -28,6 +28,10 @@ export default function UploadShop() {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [businessPermit, setBusinessPermit] = useState<string | null>(null);
+  const [validId, setValidId] = useState<string | null>(null);
+  const [contactNumber, setContactNumber] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [services, setServices] = useState<string[]>([]);
   const [otherService, setOtherService] = useState("");
   const [step, setStep] = useState(1);
@@ -67,7 +71,7 @@ export default function UploadShop() {
     Object.fromEntries(Object.values(serviceKeys).map((key) => [key, false]))
   );
 
-  const pickImage = async () => {
+  const pickImage = async (setImageCallback: (uri: string | null) => void) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       base64: true,
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -78,7 +82,7 @@ export default function UploadShop() {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const selectedAsset = result.assets[0];
       if (selectedAsset.base64) {
-        setImage(`data:image/jpeg;base64,${selectedAsset.base64}`);
+        setImageCallback(`data:image/jpeg;base64,${selectedAsset.base64}`);
       } else {
         Alert.alert("Base64 data is missing from the selected image.");
       }
@@ -104,8 +108,8 @@ export default function UploadShop() {
   };
 
   const handleUpload = async () => {
-    if (!name || !description || !location) {
-      Alert.alert("Please fill in all fields.");
+    if (!name || !description || !location || !contactNumber || !postalCode || !businessPermit || !validId) {
+      Alert.alert("Please fill in all fields and upload all required documents.");
       return;
     }
 
@@ -125,6 +129,10 @@ export default function UploadShop() {
         description,
         location,
         image,
+        businessPermit,
+        validId,
+        contactNumber,
+        postalCode,
         services,
         owner: user.uid,
         createdAt: Timestamp.now(),
@@ -151,6 +159,22 @@ export default function UploadShop() {
           <Text style={styles.label}>Location</Text>
           <TextInput style={styles.input} value={location} onChangeText={setLocation} />
 
+          <Text style={styles.label}>Contact Number</Text>
+          <TextInput
+            style={styles.input}
+            value={contactNumber}
+            onChangeText={setContactNumber}
+            keyboardType="phone-pad"
+          />
+
+          <Text style={styles.label}>Postal Code</Text>
+          <TextInput
+            style={styles.input}
+            value={postalCode}
+            onChangeText={setPostalCode}
+            keyboardType="numeric"
+          />
+
           <Button title="Next" onPress={() => setStep(2)} />
         </>
       )}
@@ -158,8 +182,17 @@ export default function UploadShop() {
       {step === 2 && (
         <>
           <Text style={styles.label}>Shop Image</Text>
-          <Button title="Pick Image" onPress={pickImage} />
+          <Button title="Pick Image" onPress={() => pickImage(setImage)} />
           {image && <Image source={{ uri: image }} style={styles.image} />}
+
+          <Text style={styles.label}>Business Permit</Text>
+          <Button title="Upload Business Permit" onPress={() => pickImage(setBusinessPermit)} />
+          {businessPermit && <Text style={styles.uploadedText}>Business Permit Uploaded</Text>}
+
+          <Text style={styles.label}>Valid ID</Text>
+          <Button title="Upload Valid ID" onPress={() => pickImage(setValidId)} />
+          {validId && <Text style={styles.uploadedText}>Valid ID Uploaded</Text>}
+
           <Button title="Next" onPress={() => setStep(3)} />
         </>
       )}
@@ -221,6 +254,11 @@ const styles = StyleSheet.create({
   image: {
     width: 200,
     height: 200,
+    marginBottom: 10,
+  },
+  uploadedText: {
+    fontSize: 14,
+    color: "green",
     marginBottom: 10,
   },
 });
