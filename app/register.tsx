@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
@@ -27,6 +28,8 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const [loading, setLoading] = useState(false); // Loading state
+  const [roleLoading, setRoleLoading] = useState(false); // Role selection loading state
 
   const auth = getAuth(app);
   const db = getFirestore(app);
@@ -69,6 +72,7 @@ const Register = () => {
   };
 
   const handleAcceptTerms = async () => {
+    setLoading(true); // Start loading
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -91,7 +95,17 @@ const Register = () => {
     } catch (error) {
       console.log("Registration Error:", error);
       Alert.alert("Error");
+    } finally {
+      setLoading(false); // Stop loading
     }
+  };
+
+  const handleRoleSelection = (selectedRole: string) => {
+    setRoleLoading(true); // Start role selection loading
+    setTimeout(() => {
+      setRole(selectedRole);
+      setRoleLoading(false); // Stop role selection loading
+    }, 500); // Simulate a delay for better UX
   };
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -105,13 +119,31 @@ const Register = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Register</Text>
 
-      <View style={styles.roleButtons}>
-        <TouchableOpacity style={styles.roleBtn} onPress={() => setRole("customer")}>
-          <Text style={styles.roleText}>Customer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.roleBtn} onPress={() => setRole("seller")}>
-          <Text style={styles.roleText}>Seller</Text>
-        </TouchableOpacity>
+      <View style={styles.roleSelectionContainer}>
+        {roleLoading ? (
+          <ActivityIndicator size="small" color="#008CBA" />
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.roleCard,
+                role === "customer" && styles.selectedRoleCard, // Highlight selected role
+              ]}
+              onPress={() => handleRoleSelection("customer")}
+            >
+              <Text style={styles.roleCardText}>Customer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.roleCard,
+                role === "seller" && styles.selectedRoleCard, // Highlight selected role
+              ]}
+              onPress={() => handleRoleSelection("seller")}
+            >
+              <Text style={styles.roleCardText}>Seller</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <TextInput style={styles.input} placeholder="First Name" value={firstName} onChangeText={setFirstName} />
@@ -121,9 +153,13 @@ const Register = () => {
       <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
       <TextInput style={styles.input} placeholder="Confirm Password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
 
-      <TouchableOpacity style={styles.registerBtn} onPress={handleRegisterPress}>
-        <Text style={styles.registerText}>Register</Text>
-      </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator size="large" color="#4CAF50" />
+      ) : (
+        <TouchableOpacity style={styles.registerBtn} onPress={handleRegisterPress}>
+          <Text style={styles.registerText}>Register</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal visible={showTermsModal} animationType="slide">
         <View style={styles.modalContainer}>
@@ -156,13 +192,28 @@ const Register = () => {
 const styles = StyleSheet.create({
   container: { padding: 20, backgroundColor: "#fff", flex: 1 },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
-  roleButtons: { flexDirection: "row", justifyContent: "space-around", marginBottom: 10 },
-  roleBtn: {
-    backgroundColor: "#008CBA",
-    padding: 10,
-    borderRadius: 5,
+  roleSelectionContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 20,
   },
-  roleText: { color: "#fff" },
+  roleCard: {
+    backgroundColor: "#f0f0f0",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+    width: "40%",
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  selectedRoleCard: {
+    backgroundColor: "#008CBA",
+    borderColor: "#0073A8",
+  },
+  roleCardText: {
+    color: "#000",
+    fontWeight: "bold",
+  },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",

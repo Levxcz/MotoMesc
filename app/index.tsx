@@ -1,32 +1,33 @@
 import { useRouter } from "expo-router";
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from "react-native";
 import { useState } from "react";
 import { loginUser } from "../authService";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
-
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false); // Loading state
 
   const handleLogin = async () => {
+    setLoading(true); // Start loading
     try {
       const user = await loginUser(email, password);
       if (user) {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
-  
+
         if (userSnap.exists()) {
           const userData = userSnap.data();
-  
+
           Alert.alert("Success", "Login Successful");
-  
+
           if (userData.role === "customer") {
-            router.push("/CustomerHomeScreen"); // ✅ Use relative path
+            router.push("/CustomerHomeScreen");
           } else {
-            router.push("/SellerHomeScreen"); // ✅ Use relative path
+            router.push("/SellerHomeScreen");
           }
         } else {
           Alert.alert("Error", "User data not found.");
@@ -37,6 +38,8 @@ export default function LoginScreen() {
     } catch (error) {
       console.error("Login error:", error);
       Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false); // Stop loading
     }
   };
 
@@ -45,10 +48,14 @@ export default function LoginScreen() {
       <Text style={styles.title}>Login</Text>
       <TextInput style={styles.input} placeholder="Email" onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="Password" secureTextEntry onChangeText={setPassword} />
-      
-      <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
-        <Text style={styles.loginButtonText}>Login</Text>
-      </TouchableOpacity>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="blue" /> // Loading indicator
+      ) : (
+        <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
+          <Text style={styles.loginButtonText}>Login</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity onPress={() => router.push("/register")} style={styles.createAccountButton}>
         <Text style={styles.createAccountText}>Create an Account</Text>
