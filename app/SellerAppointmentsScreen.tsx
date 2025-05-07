@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Text, View, Image, TouchableOpacity, StyleSheet, ScrollView, Modal, Pressable, Alert } from 'react-native';
+import { Text, View, Image, TouchableOpacity, StyleSheet, ScrollView, Modal, Pressable, Alert, TextInput } from 'react-native';
 import { db } from '../firebaseConfig';
 import { doc, updateDoc, collection, getDocs } from 'firebase/firestore';
-import { sendNotification } from '../sendNotification'
+import { sendNotification } from '../sendNotification';
 
 interface Appointment {
   id: string;
@@ -15,12 +15,15 @@ interface Appointment {
   status: string;
   uid: string; // Add customerId field to be used for notifications
   tracking: Array<{ step: string, timestamp: any }>;
+  receiptImage?: string; // Add receiptImage property
 }
 
 const SellerAppointmentScreen: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [sellerComment, setSellerComment] = useState("");
+  const [suggestedTime, setSuggestedTime] = useState("");
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -42,11 +45,13 @@ const SellerAppointmentScreen: React.FC = () => {
 
     await updateDoc(docRef, {
       status: "confirmed",
-      tracking: [...(selected.tracking || []), { step: "Confirmed by Seller", timestamp: new Date() }]
+      tracking: [...(selected.tracking || []), { step: "Confirmed by Seller", timestamp: new Date() }],
+      sellerComment,
+      suggestedTime,
     });
 
     // Trigger notification to the customer
-    await sendNotification(selected.uid, 'confirmed');
+    await sendNotification(selected.uid, `Your appointment has been confirmed. Comment: ${sellerComment}. Suggested Time: ${suggestedTime}`);
 
     setModalVisible(false);
     Alert.alert("Appointment Confirmed", "You have confirmed the appointment.");
@@ -63,7 +68,7 @@ const SellerAppointmentScreen: React.FC = () => {
     });
 
     // Trigger notification to the customer
-    await sendNotification(selected.uid, 'declined');
+    await sendNotification(selected.uid, 'Your appointment has been declined.');
 
     setModalVisible(false);
     Alert.alert("Appointment Declined", "You have declined the appointment.");
@@ -113,6 +118,32 @@ const SellerAppointmentScreen: React.FC = () => {
                 {selectedAppointment.createdAt?.seconds ? new Date(selectedAppointment.createdAt.seconds * 1000).toLocaleString() : 'N/A'}
               </Text>
               <Text><Text style={styles.boldText}>Status:</Text> {selectedAppointment.status}</Text>
+
+              {selectedAppointment.receiptImage && (
+                <>
+                  <Text style={styles.boldText}>Payment Receipt:</Text>
+                  <Image 
+                    source={{ uri: selectedAppointment.receiptImage }} 
+                    style={styles.receiptImage} 
+                  />
+                </>
+              )}
+
+              <Text style={styles.boldText}>Comment:</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Add a comment about the service"
+                value={sellerComment}
+                onChangeText={setSellerComment}
+              />
+
+              <Text style={styles.boldText}>Suggested Booking Time:</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Suggest a booking time"
+                value={suggestedTime}
+                onChangeText={setSuggestedTime}
+              />
 
               <View style={styles.buttonContainer}>
                 <TouchableOpacity 
@@ -217,6 +248,20 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     alignItems: 'center',
+  },
+  input: {
+    height: 40,
+    borderColor: "gray",
+    borderWidth: 1,
+    marginBottom: 12,
+    paddingLeft: 8,
+    borderRadius: 5,
+  },
+  receiptImage: {
+    width: "100%",
+    height: 200,
+    marginBottom: 10,
+    borderRadius: 10,
   }
 });
 
