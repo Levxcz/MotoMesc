@@ -35,10 +35,11 @@ export default function UploadShop() {
   const [services, setServices] = useState<string[]>([]);
   const [otherService, setOtherService] = useState("");
   const [step, setStep] = useState(1);
+  const [gcashQrCode, setGcashQrCode] = useState<string | null>(null);
   const router = useRouter();
 
   const serviceKeys = {
-    "Engine Repairs": "engineRepairs",
+    "Engine Repairs 8hrs ": "engineRepairs",
     "Transmission Repairs": "transmissionRepairs",
     "Electrical Repairs": "electricalRepairs",
     "Brake Repairs": "brakeRepairs",
@@ -108,8 +109,8 @@ export default function UploadShop() {
   };
 
   const handleUpload = async () => {
-    if (!name || !description || !location || !contactNumber || !postalCode || !businessPermit || !validId) {
-      Alert.alert("Please fill in all fields and upload all required documents.");
+    if (!name || !description || !location || !contactNumber || !postalCode || !businessPermit || !validId || !gcashQrCode) {
+      Alert.alert("Please fill in all fields and upload all required documents, including the GCash QR Code.");
       return;
     }
 
@@ -134,6 +135,7 @@ export default function UploadShop() {
         contactNumber,
         postalCode,
         services,
+        gcashQrCode, // Save the GCash QR Code image
         owner: user.uid,
         createdAt: Timestamp.now(),
       });
@@ -192,6 +194,10 @@ export default function UploadShop() {
           <Text style={styles.label}>Valid ID</Text>
           <Button title="Upload Valid ID" onPress={() => pickImage(setValidId)} />
           {validId && <Text style={styles.uploadedText}>Valid ID Uploaded</Text>}
+
+          <Text style={styles.label}>GCash QR Code</Text>
+          <Button title="Upload GCash QR Code" onPress={() => pickImage(setGcashQrCode)} />
+          {gcashQrCode && <Image source={{ uri: gcashQrCode }} style={styles.image} />}
 
           <Button title="Next" onPress={() => setStep(3)} />
         </>

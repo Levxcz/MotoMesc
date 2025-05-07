@@ -11,6 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   Button,
+  Alert,
 } from "react-native";
 import {
   doc,
@@ -35,6 +36,7 @@ interface Shop {
   createdAt: any;
   owner: string;
   services?: string[];
+  gcashQrCode?: string; // Add GCash QR Code field
 }
 
 const ViewShop: React.FC = () => {
@@ -44,6 +46,7 @@ const ViewShop: React.FC = () => {
   const [plateNumber, setPlateNumber] = useState("");
   const [description, setDescription] = useState("");
   const [motoImage, setMotoImage] = useState<string | null>(null);
+  const [receiptImage, setReceiptImage] = useState<string | null>(null); // For payment receipt
   const [firstName, setFirstName] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<string>("");
   const [lastName, setLastName] = useState("");
@@ -91,60 +94,56 @@ const ViewShop: React.FC = () => {
     fetchCustomerDetails();
   }, [shopId]);
 
-  const formatServiceName = (key: string) => {
-    return key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase());
-  };
-
-  const pickImage = async () => {
+  const pickImage = async (setImageCallback: (uri: string | null) => void) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
     });
 
     if (!result.canceled) {
-      setMotoImage(result.assets[0].uri);
+      setImageCallback(result.assets[0].uri);
     }
   };
 
   const handleAppointmentSubmit = async () => {
-    if (!plateNumber || !description || !motoImage || !appointmentDate) {
-      alert("Please complete all fields.");
+    if (!plateNumber || !description || !motoImage || !appointmentDate || !receiptImage) {
+      alert("Please complete all fields, including uploading the payment receipt.");
       return;
     }
-  
+
     const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate);
     if (!isValidDate) {
       alert("Invalid date format. Please use YYYY-MM-DD.");
       return;
     }
-  
+
     try {
       const auth = getAuth();
       const user = auth.currentUser;
-  
+
       if (!user) {
         alert("You must be logged in to make an appointment.");
         return;
       }
-  
+
       const uid = user.uid;
-  
-      // 🔍 Check for existing pending appointment for the same shop
+
+      // Check for existing pending appointment for the same shop
       const q = query(
         collection(db, "appointments"),
         where("uid", "==", uid),
         where("shopId", "==", shopId),
         where("status", "==", "Pending")
       );
-  
+
       const querySnapshot = await getDocs(q);
-  
+
       if (!querySnapshot.empty) {
         alert("You already have a pending appointment at this shop.");
         return;
       }
-  
-      // 📝 Add new appointment
+
+      // Add new appointment
       const docRef = await addDoc(collection(db, "appointments"), {
         appointmentId: "",
         shopId,
@@ -152,24 +151,26 @@ const ViewShop: React.FC = () => {
         plateNumber,
         description,
         image: motoImage,
+        receiptImage, // Save the payment receipt
         createdAt: serverTimestamp(),
         appointmentDate, // Save as string
         customerName: `${firstName} ${lastName}`,
         status: "Pending",
       });
-  
-      // 🆔 Update the document with its own ID
+
+      // Update the document with its own ID
       await setDoc(
         doc(db, "appointments", docRef.id),
         { appointmentId: docRef.id },
         { merge: true }
       );
-  
+
       alert("Appointment submitted!");
       setModalVisible(false);
       setPlateNumber("");
       setDescription("");
       setMotoImage(null);
+      setReceiptImage(null);
       setAppointmentDate("");
     } catch (error) {
       console.error("Error making appointment:", error);
@@ -177,8 +178,6 @@ const ViewShop: React.FC = () => {
     }
   };
 
-  
-  
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
@@ -214,11 +213,18 @@ const ViewShop: React.FC = () => {
       {shop.services && shop.services.length > 0 ? (
         shop.services.map((serviceKey) => (
           <Text key={serviceKey} style={styles.text}>
-            • {formatServiceName(serviceKey)}
+            • {serviceKey}
           </Text>
         ))
       ) : (
         <Text style={styles.text}>No services listed.</Text>
+      )}
+
+      {shop.gcashQrCode && (
+        <>
+          <Text style={styles.label}>GCash QR Code:</Text>
+          <Image source={{ uri: shop.gcashQrCode }} style={styles.qrCodeImage} />
+        </>
       )}
 
       <TouchableOpacity style={styles.appointmentBtn} onPress={() => setModalVisible(true)}>
@@ -226,42 +232,57 @@ const ViewShop: React.FC = () => {
       </TouchableOpacity>
 
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalView}>
-          <Text style={styles.modalTitle}>Book an Appointment</Text>
-          <Text style={{ textAlign: "center", marginBottom: 10 }}>
-            Customer: {firstName} {lastName}
-          </Text>
-
-          <TextInput
-            placeholder="Plate Number"
-            value={plateNumber}
-            onChangeText={setPlateNumber}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Describe the issue"
-            value={description}
-            onChangeText={setDescription}
-            style={[styles.input, { height: 100 }]}
-            multiline
-          />
-            <TextInput
-            placeholder="Enter appointment date (YYYY-MM-DD)"
-            value={appointmentDate}
-            onChangeText={setAppointmentDate}
-            style={styles.input}
-          />
-
-
-          <TouchableOpacity onPress={pickImage} style={styles.uploadBtn}>
-            <Text style={styles.btnText}>
-              {motoImage ? "Change Image" : "Upload Motorcycle Photo"}
+        <View style={styles.modalContainer}>
+          <ScrollView contentContainerStyle={styles.modalScrollView}>
+            <Text style={styles.modalTitle}>Book an Appointment</Text>
+            <Text style={{ textAlign: "center", marginBottom: 10 }}>
+              Customer: {firstName} {lastName}
             </Text>
-          </TouchableOpacity>
-          {motoImage && <Image source={{ uri: motoImage }} style={styles.previewImage} />}
 
-          <Button title="Submit Appointment" onPress={handleAppointmentSubmit} />
-          <Button title="Cancel" color="red" onPress={() => setModalVisible(false)} />
+            <TextInput
+              placeholder="Plate Number"
+              value={plateNumber}
+              onChangeText={setPlateNumber}
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Describe the issue"
+              value={description}
+              onChangeText={setDescription}
+              style={[styles.input, { height: 100 }]}
+              multiline
+            />
+            <TextInput
+              placeholder="Enter appointment date (YYYY-MM-DD)"
+              value={appointmentDate}
+              onChangeText={setAppointmentDate}
+              style={styles.input}
+            />
+
+            <TouchableOpacity onPress={() => pickImage(setMotoImage)} style={styles.uploadBtn}>
+              <Text style={styles.btnText}>
+                {motoImage ? "Change Motorcycle Image" : "Upload Motorcycle Photo"}
+              </Text>
+            </TouchableOpacity>
+            {motoImage && <Image source={{ uri: motoImage }} style={styles.previewImage} />}
+
+            {shop.gcashQrCode && (
+              <>
+                <Text style={styles.label}>GCash QR Code:</Text>
+                <Image source={{ uri: shop.gcashQrCode }} style={styles.qrCodeImage} />
+              </>
+            )}
+
+            <TouchableOpacity onPress={() => pickImage(setReceiptImage)} style={styles.uploadBtn}>
+              <Text style={styles.btnText}>
+                {receiptImage ? "Change Receipt Image" : "Upload Payment Receipt"}
+              </Text>
+            </TouchableOpacity>
+            {receiptImage && <Image source={{ uri: receiptImage }} style={styles.previewImage} />}
+
+            <Button title="Submit Appointment" onPress={handleAppointmentSubmit} />
+            <Button title="Cancel" color="red" onPress={() => setModalVisible(false)} />
+          </ScrollView>
         </View>
       </Modal>
     </ScrollView>
@@ -319,12 +340,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  modalView: {
-    marginTop: 100,
-    backgroundColor: "white",
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalScrollView: {
     padding: 20,
+    backgroundColor: "white",
     borderRadius: 10,
-    marginHorizontal: 20,
+    width: "90%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -356,6 +382,12 @@ const styles = StyleSheet.create({
     height: 150,
     marginBottom: 10,
     borderRadius: 10,
+  },
+  qrCodeImage: {
+    width: 200,
+    height: 200,
+    alignSelf: "center",
+    marginBottom: 10,
   },
 });
 
