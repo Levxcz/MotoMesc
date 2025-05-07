@@ -38,7 +38,7 @@ export default function UploadShop() {
   const router = useRouter();
 
   const serviceKeys = {
-    "Engine Repairs": "engineRepairs",
+    "Engine Repairs 8hrs ": "engineRepairs",
     "Transmission Repairs": "transmissionRepairs",
     "Electrical Repairs": "electricalRepairs",
     "Brake Repairs": "brakeRepairs",
