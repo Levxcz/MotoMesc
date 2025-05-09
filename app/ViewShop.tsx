@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: "#007AFF",
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 50,
     alignItems: "center",
   },
   btnText: {

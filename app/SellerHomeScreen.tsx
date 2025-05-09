@@ -8,6 +8,7 @@ import {
   FlatList,
   Alert,
   BackHandler,
+  Image,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { auth, db } from "../firebaseConfig";
@@ -28,6 +29,7 @@ type Shop = {
   description: string;
   location: string;
   owner: string;
+  image?: string;
 };
 
 type Appointment = {
@@ -135,6 +137,9 @@ export default function SellerHomeScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.shopCard}>
+            {item.image && (
+              <Image source={{ uri: item.image }} style={styles.shopImage} />
+            )}
             <Text style={styles.shopName}>{item.name}</Text>
             <Text>{item.description}</Text>
             <Text>{item.location}</Text>
@@ -179,5 +184,12 @@ const styles = StyleSheet.create({
   shopName: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 5,
+  },
+  shopImage: {
+    width: "100%",
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
   },
 });
