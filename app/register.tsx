@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -10,11 +10,12 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getAuth, signInWithPhoneNumber, RecaptchaVerifier, PhoneAuthProvider, signInWithCredential,createUserWithEmailAndPassword, } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { app } from "../firebaseConfig";
 import { useRouter } from "expo-router";
 import { NativeSyntheticEvent, NativeScrollEvent } from "react-native"; // Import types
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 
 const Register = () => {
   const router = useRouter();
@@ -26,13 +27,74 @@ const Register = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [otp, setOtp] = useState(""); // OTP input
+  const [verificationId, setVerificationId] = useState(""); // Store verification ID
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [loading, setLoading] = useState(false); // Loading state
   const [roleLoading, setRoleLoading] = useState(false); // Role selection loading state
+  const [otpSent, setOtpSent] = useState(false); // OTP sent state
 
   const auth = getAuth(app);
   const db = getFirestore(app);
+
+  // Firebase reCAPTCHA verifier
+  const recaptchaVerifier = useRef(null);
+
+  const sendOtp = async () => {
+    if (!phoneNumber) {
+      Alert.alert("Error", "Please enter your phone number.");
+      return;
+    }
+
+    if (!recaptchaVerifier.current) {
+      Alert.alert("Error", "reCAPTCHA verifier is not initialized.");
+      return;
+    }
+
+    try {
+      const phoneProvider = new PhoneAuthProvider(auth);
+      const verificationId = await phoneProvider.verifyPhoneNumber(
+        phoneNumber,
+        recaptchaVerifier.current // Ensure this is not null
+      );
+      setVerificationId(verificationId);
+      setOtpSent(true);
+      Alert.alert("Success", "OTP sent to your phone number.");
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      Alert.alert("Error", "Failed to send OTP. Please try again.");
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (!otp) {
+      Alert.alert("Error", "Please enter the OTP.");
+      return;
+    }
+
+    try {
+      const credential = PhoneAuthProvider.credential(verificationId, otp);
+      const userCredential = await signInWithCredential(auth, credential);
+
+      // Save user data to Firestore
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        role,
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        createdAt: new Date(),
+      });
+
+      Alert.alert("Success", "Phone number verified and account created!");
+      router.replace("/CustomerHomeScreen");
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      Alert.alert("Error", "Invalid OTP. Please try again.");
+    }
+  };
 
   const handleRegisterPress = () => {
     const nameRegex = /^[A-Za-z]+$/;
@@ -117,6 +179,12 @@ const Register = () => {
 
   return (
     <View style={styles.container}>
+      {/* Firebase reCAPTCHA Modal */}
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={app.options} // Ensure this is your Firebase app configuration
+      />
+
       <Text style={styles.title}>Register</Text>
 
       <View style={styles.roleSelectionContainer}>
@@ -153,13 +221,20 @@ const Register = () => {
       <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
       <TextInput style={styles.input} placeholder="Confirm Password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#4CAF50" />
-      ) : (
-        <TouchableOpacity style={styles.registerBtn} onPress={handleRegisterPress}>
-          <Text style={styles.registerText}>Register</Text>
+      {!otpSent ? (
+        <TouchableOpacity style={styles.registerBtn} onPress={sendOtp}>
+          <Text style={styles.registerText}>Send OTP</Text>
         </TouchableOpacity>
+      ) : (
+        <>
+          <TextInput style={styles.input} placeholder="Enter OTP" value={otp} onChangeText={setOtp} keyboardType="number-pad" />
+          <TouchableOpacity style={styles.registerBtn} onPress={verifyOtp}>
+            <Text style={styles.registerText}>Verify OTP</Text>
+          </TouchableOpacity>
+        </>
       )}
+
+      <View id="recaptcha-container" />
 
       <Modal visible={showTermsModal} animationType="slide">
         <View style={styles.modalContainer}>
