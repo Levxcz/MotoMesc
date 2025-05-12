@@ -3,7 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityInd
 import { useState } from "react";
 import { loginUser } from "../authService";
 import { doc, getDoc } from "firebase/firestore";
+import { sendPasswordResetEmail } from "firebase/auth";
 import { db } from "../firebaseConfig";
+import { auth } from "../firebaseConfig"; // Ensure auth is imported
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -43,9 +45,24 @@ export default function LoginScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert("Error", "Please enter your email to reset your password.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Alert.alert("Success", "Password reset email sent. Please check your inbox.");
+    } catch (error) {
+      console.error("Password reset error:", error);
+      Alert.alert("Error", "Failed to send password reset email. Please try again.");
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>MOTODROID LOGIN</Text>
+      <Text style={styles.title}>Login</Text>
       <TextInput style={styles.input} placeholder="Email" onChangeText={setEmail} />
       <TextInput style={styles.input} placeholder="Password" secureTextEntry onChangeText={setPassword} />
 
@@ -57,6 +74,10 @@ export default function LoginScreen() {
         </TouchableOpacity>
       )}
 
+      <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordButton}>
+        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity onPress={() => router.push("/register")} style={styles.createAccountButton}>
         <Text style={styles.createAccountText}>Create an Account</Text>
       </TouchableOpacity>
@@ -65,48 +86,13 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  input:{
-   borderWidth: 1,
-  borderColor: '#ccc',
-  borderRadius: 8,
-  paddingHorizontal:16,
-  paddingVertical: 12,
-  marginBottom: 12,
-  },
-  loginButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 14,
-    borderRadius: 50,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  loginButtonText:  {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  createAccountButton: {
-    backgroundColor: '#eee',
-    paddingVertical: 12,
-    borderRadius: 30,
-    alignItems: 'center',
-  },
-  createAccountText: {
-    color: '#333',
-    fontSize: 16,
-  },
-
-
-
-  
-  
-
-
+  input: { width: "100%", padding: 10, borderWidth: 1, borderColor: "#ccc", marginBottom: 10, borderRadius: 5 },
+  loginButton: { backgroundColor: "blue", padding: 15, borderRadius: 5, width: "100%", alignItems: "center" },
+  loginButtonText: { color: "white", fontWeight: "bold" },
+  forgotPasswordButton: { marginTop: 10 },
+  forgotPasswordText: { color: "red", fontWeight: "bold" },
+  createAccountButton: { marginTop: 10 },
+  createAccountText: { color: "blue", fontWeight: "bold" },
 });
