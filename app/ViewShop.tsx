@@ -50,6 +50,7 @@ const ViewShop: React.FC = () => {
   const [firstName, setFirstName] = useState("");
   const [appointmentDate, setAppointmentDate] = useState<string>("");
   const [lastName, setLastName] = useState("");
+  const [motorcycleBrand, setMotorcycleBrand] = useState("");
 
   const route = useRoute();
   const { shopId } = route.params as { shopId: string };
@@ -106,8 +107,8 @@ const ViewShop: React.FC = () => {
   };
 
   const handleAppointmentSubmit = async () => {
-    if (!plateNumber || !description || !motoImage || !appointmentDate || !receiptImage) {
-      alert("Please complete all fields, including uploading the payment receipt.");
+    if (!plateNumber || !description || !motoImage || !appointmentDate || !receiptImage || !motorcycleBrand) {
+      alert("Please complete all fields, including the motorcycle brand.");
       return;
     }
 
@@ -150,6 +151,7 @@ const ViewShop: React.FC = () => {
         uid,
         plateNumber,
         description,
+        motorcycleBrand, // Include motorcycle brand
         image: motoImage,
         receiptImage, // Save the payment receipt
         createdAt: serverTimestamp(),
@@ -169,6 +171,7 @@ const ViewShop: React.FC = () => {
       setModalVisible(false);
       setPlateNumber("");
       setDescription("");
+      setMotorcycleBrand(""); // Reset motorcycle brand
       setMotoImage(null);
       setReceiptImage(null);
       setAppointmentDate("");
@@ -239,6 +242,12 @@ const ViewShop: React.FC = () => {
               Customer: {firstName} {lastName}
             </Text>
 
+            <TextInput
+              placeholder="Enter Motorcycle Brand"
+              value={motorcycleBrand}
+              onChangeText={setMotorcycleBrand}
+              style={styles.input}
+            />
             <TextInput
               placeholder="Plate Number"
               value={plateNumber}
@@ -332,7 +341,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: "#007AFF",
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 50,
     alignItems: "center",
   },
   btnText: {

@@ -118,7 +118,7 @@ export default function CustomerHomeScreen() {
             <View style={styles.shopCard}>
               {item.image && (
                 <Image
-                  source={{ uri: `data:image/jpeg;base64,${item.image}` }}
+                  source={{ uri: item.image }} // Use the image URL directly
                   style={styles.image}
                   resizeMode="cover"
                 />
@@ -158,19 +158,20 @@ export default function CustomerHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  container: { flex: 1, padding: 5, backgroundColor: "#f2f3f4"},
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
+  title: { fontSize: 24, fontWeight: "bold", textAlign: "center", borderRadius: 5, marginBottom: 10, backgroundColor: "BDD5E7",},
   loadingText: { textAlign: "center", marginTop: 20, fontSize: 16 },
   shopCard: {
     borderWidth: 1,
     borderColor: "#ccc",
     padding: 15,
-    borderRadius: 10,
+    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.5)",
+    borderRadius: 20,
     marginBottom: 15,
     backgroundColor: "#f5f5f5",
   },
@@ -190,6 +191,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
+    
   },
   buttonText: {
     color: "white",

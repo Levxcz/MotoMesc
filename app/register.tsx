@@ -200,14 +200,14 @@ const styles = StyleSheet.create({
   roleCard: {
     backgroundColor: "#f0f0f0",
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 50,
     alignItems: "center",
     width: "40%",
     borderWidth: 1,
     borderColor: "#ccc",
   },
   selectedRoleCard: {
-    backgroundColor: "#008CBA",
+    backgroundColor: "#007bff",
     borderColor: "#0073A8",
   },
   roleCardText: {
@@ -222,9 +222,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   registerBtn: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#007bff",
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 50,
     alignItems: "center",
     marginTop: 10,
   },

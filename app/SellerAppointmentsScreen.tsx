@@ -16,6 +16,7 @@ interface Appointment {
   uid: string; // Add customerId field to be used for notifications
   tracking: Array<{ step: string, timestamp: any }>;
   receiptImage?: string; // Add receiptImage property
+  motorcycleBrand?: string; // Add motorcycleBrand property
 }
 
 const SellerAppointmentScreen: React.FC = () => {
@@ -112,6 +113,7 @@ const SellerAppointmentScreen: React.FC = () => {
               <Text><Text style={styles.boldText}>Customer:</Text> {selectedAppointment.customerName}</Text>
               <Text><Text style={styles.boldText}>Service:</Text> {selectedAppointment.description}</Text>
               <Text><Text style={styles.boldText}>Plate Number:</Text> {selectedAppointment.plateNumber}</Text>
+              <Text><Text style={styles.boldText}>Motorcycle Brand:</Text> {selectedAppointment.motorcycleBrand || 'N/A'}</Text>
               <Text><Text style={styles.boldText}>Booking Date:</Text> {selectedAppointment.appointmentDate}</Text>
               <Text>
                 <Text style={styles.boldText}>Created At:</Text>{' '}
@@ -201,6 +203,7 @@ const styles = StyleSheet.create({
   },
   boldText: {
     fontWeight: 'bold',
+    marginBottom: 4,
   },
   modalOverlay: {
     flex: 1,
